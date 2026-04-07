@@ -1,0 +1,26 @@
+Package: WRSVMr
+Type: Package
+Title: Weighted Relaxed Support Vector Machine for Multiclass Classification
+Version: 0.1.0
+Authors@R: c(
+    person("Annice", "Najafi", email = "annicenajafi27@gmail.com", role = c("aut", "cre")),
+    person("Talayeh", "Razzaghi", role = "aut"))
+Description: Provides four decomposition strategies (Crammer-Singer, SimMSVM,
+    One-vs-One, One-vs-Rest) crossed with four formulations (SVM, RSVM,
+    WSVM, WRSVM) for multiclass classification under class imbalance and
+    label noise. Wraps the Python wrsvm package via reticulate.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+Imports:
+    reticulate (>= 1.30)
+Suggests:
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Config/reticulate:
+    list(
+        packages = list(
+            list(package = "wrsvm")
+        )
+    )
+RoxygenNote: 7.3.0
