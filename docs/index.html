@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WRSVM: Open-Source Toolkit for Robust Multiclass Classification</title>
+<meta name="description" content="Open-Source Python, R, and Julia Toolkit for Robust Multiclass Classification Under Class Imbalance and Label Noise." />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="hero">
+  <div class="container">
+    <h1>WRSVM</h1>
+    <p class="tagline">Open-Source Python, R, and Julia Toolkit for Robust Multiclass Classification Under Class Imbalance and Label Noise.</p>
+    <div class="hero-buttons">
+      <a class="btn primary" href="#install">Install</a>
+      <a class="btn ghost" href="https://github.com/annicenajafi/wrsvm">View on GitHub</a>
+    </div>
+    <div class="badges">
+      <span class="badge">Python 3.9+</span>
+      <span class="badge">R 4.0+</span>
+      <span class="badge">Julia 1.9+</span>
+      <span class="badge">MIT License</span>
+    </div>
+  </div>
+</header>
+
+<section class="container section">
+  <h2>What is WRSVM?</h2>
+  <p>
+    WRSVM combines class-weighted regularization with per-class slack relaxation,
+    producing a multiclass SVM that remains accurate when (a) class sizes are
+    severely imbalanced and (b) a fraction of training labels are corrupted.
+    The framework supports four decomposition strategies (Crammer-Singer,
+    SimMSVM, One-vs-One, One-vs-Rest) crossed with four formulations:
+    SVM, RSVM, WSVM, and WRSVM.
+  </p>
+
+  <div class="grid-3">
+    <div class="card">
+      <h3>Class-weighted</h3>
+      <p>Per-class regularization caps prevent the majority class from dominating the dual.</p>
+    </div>
+    <div class="card">
+      <h3>Noise-robust</h3>
+      <p>Per-class slack budgets absorb mislabeled minority samples without sacrificing margin.</p>
+    </div>
+    <div class="card">
+      <h3>Three runtimes</h3>
+      <p>Identical formulation in Python (CVXPY), R (reticulate wrapper), and Julia (JuMP).</p>
+    </div>
+  </div>
+</section>
+
+<section id="install" class="container section">
+  <h2>Install</h2>
+  <p>Pick your language. Full troubleshooting is in each package&rsquo;s <code>INSTALL.md</code>.</p>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="py">Python</button>
+    <button class="tab" data-tab="r">R</button>
+    <button class="tab" data-tab="jl">Julia</button>
+  </div>
+
+  <div class="tab-panel active" id="py">
+    <h3>Python (<code>wrsvm</code>)</h3>
+    <p>Requires Python 3.9+.</p>
+    <pre><code># core install
+pip install wrsvm
+
+# from a local clone
+cd wrsvm_package
+pip install -e .
+
+# optional extras
+pip install "wrsvm[gpu]"      # PyTorch kernel backend
+pip install "wrsvm[gurobi]"   # Gurobi solver
+pip install "wrsvm[dev]"      # pytest + coverage</code></pre>
+
+    <h4>Quick start</h4>
+<pre><code class="lang-python">from wrsvm import WRSVMClassifier, inject_outliers_minority
+from sklearn.datasets import load_iris
+from sklearn.preprocessing import StandardScaler
+
+X, y = load_iris(return_X_y=True)
+X = StandardScaler().fit_transform(X)
+
+y_noisy = inject_outliers_minority(X, y, outlier_rate=0.3, seed=0)
+
+clf = WRSVMClassifier(C=100.0, gamma=0.1, upsilon=0.2)
+clf.fit(X, y_noisy)
+print("accuracy:", clf.score(X, y))
+</code></pre>
+    <p><a class="link" href="https://github.com/annicenajafi/wrsvm/blob/main/wrsvm_package/INSTALL.md">Full Python install guide &rarr;</a></p>
+  </div>
+
+  <div class="tab-panel" id="r">
+    <h3>R (<code>WRSVMr</code>)</h3>
+    <p>Requires R 4.0+ and a working Python with the <code>wrsvm</code> package.</p>
+    <pre><code># 1) Python backend (one-time)
+reticulate::install_python(version = "3.11.9")
+reticulate::py_install("wrsvm", pip = TRUE)
+
+# 2) R wrapper
+remotes::install_github("annicenajafi/wrsvm", subdir = "WRSVMr")
+
+# or from a local clone:
+remotes::install_local("path/to/WRSVMr")</code></pre>
+
+    <h4>Quick start</h4>
+<pre><code class="lang-r">library(WRSVMr)
+
+data(iris)
+X &lt;- scale(as.matrix(iris[, 1:4]))
+y &lt;- as.integer(iris$Species)
+
+y_noisy &lt;- inject_outliers_minority(X, y, outlier_rate = 0.3, seed = 0)
+
+fit &lt;- wrsvm_fit(X, y_noisy,
+                 strategy = "cs",
+                 C = 100, gamma = 0.1, upsilon = 0.2)
+
+mean(wrsvm_predict(fit, X) == y)
+</code></pre>
+    <p><a class="link" href="https://github.com/annicenajafi/wrsvm/blob/main/WRSVMr/INSTALL.md">Full R install guide &rarr;</a></p>
+  </div>
+
+  <div class="tab-panel" id="jl">
+    <h3>Julia (<code>WRSVM.jl</code>)</h3>
+    <p>Requires Julia 1.9+. Pure Julia, no Python required.</p>
+    <pre><code>using Pkg
+
+# from a local clone (recommended while iterating)
+Pkg.develop(path = "path/to/WRSVM.jl")
+Pkg.instantiate()
+
+# or activate the package's own environment for reproducibility
+Pkg.activate("path/to/WRSVM.jl")
+Pkg.instantiate()</code></pre>
+
+    <h4>Quick start</h4>
+<pre><code class="lang-julia">using WRSVM, Statistics
+
+X = randn(100, 4)
+y = rand(1:3, 100)
+y_noisy = inject_outliers_minority(X, y; outlier_rate = 0.3, seed = 0)
+
+model = solve_crammer_singer(X, y_noisy;
+                             C = 100.0, gamma = 0.1, upsilon = 0.2)
+
+preds = predict_cs(model, X)
+println("accuracy = ", mean(preds .== y))
+</code></pre>
+    <p><a class="link" href="https://github.com/annicenajafi/wrsvm/blob/main/WRSVM.jl/INSTALL.md">Full Julia install guide &rarr;</a></p>
+  </div>
+</section>
+
+<section class="container section">
+  <h2>Decomposition strategies</h2>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Strategy</th><th>Dual size</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>cs</code></td>      <td>N &times; K</td>                   <td>Crammer-Singer direct formulation</td></tr>
+        <tr><td><code>simmsvm</code></td> <td>N</td>                             <td>Simultaneous multiclass, ~10&times; faster than <code>cs</code></td></tr>
+        <tr><td><code>ovo</code></td>     <td>N<sub>k</sub> + N<sub>j</sub></td> <td>One-vs-One pairs, majority vote</td></tr>
+        <tr><td><code>ovr</code></td>     <td>N</td>                             <td>One-vs-Rest, K binary problems</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="container section">
+  <h2>Downloads</h2>
+  <div class="grid-3">
+    <a class="dl-card" href="https://github.com/annicenajafi/wrsvm/tree/main/wrsvm_package">
+      <h3>Python</h3>
+      <p><code>wrsvm</code> v0.2.0</p>
+      <span class="dl-meta">pip / source</span>
+    </a>
+    <a class="dl-card" href="https://github.com/annicenajafi/wrsvm/tree/main/WRSVMr">
+      <h3>R</h3>
+      <p><code>WRSVMr</code> v0.1.0</p>
+      <span class="dl-meta">remotes / source</span>
+    </a>
+    <a class="dl-card" href="https://github.com/annicenajafi/wrsvm/tree/main/WRSVM.jl">
+      <h3>Julia</h3>
+      <p><code>WRSVM.jl</code> v0.1.0</p>
+      <span class="dl-meta">Pkg / source</span>
+    </a>
+  </div>
+</section>
+
+<section class="container section">
+  <h2>Citation</h2>
+  <pre><code>@article{najafi2026wrsvm,
+  title   = {Open-Source Python, R, and Julia Toolkit for Robust Multiclass Classification Under Class Imbalance and Label Noise},
+  author  = {Najafi, Annice and Razzaghi, Talayeh},
+  year    = {2026}
+}</code></pre>
+</section>
+
+<footer class="footer">
+  <div class="container">
+    <p>&copy; 2026 Annice Najafi &amp; Talayeh Razzaghi. Released under the MIT License.</p>
+    <p><a href="https://github.com/annicenajafi/wrsvm">Source on GitHub</a></p>
+  </div>
+</footer>
+
+<script>
+  document.querySelectorAll('.tab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      var target = tab.getAttribute('data-tab');
+      document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
+      document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+      tab.classList.add('active');
+      document.getElementById(target).classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>
