@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Python tutorial — WRSVM</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="container">
+    <a class="brand" href="index.html">WRSVM</a>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a class="active" href="python.html">Python</a></li>
+      <li><a href="r.html">R</a></li>
+      <li><a href="julia.html">Julia</a></li>
+      <li><a href="https://github.com/annicenajafi/WRSVM">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<header class="page-header">
+  <div class="container">
+    <h1>Python tutorial</h1>
+    <p class="tagline">Fit WRSVM on a real dataset, compare the four decomposition strategies and five kernels, and handle imbalanced data.</p>
+  </div>
+</header>
+
+<main class="container section">
+
+  <div class="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#install">Install</a></li>
+      <li><a href="#load">Load a dataset</a></li>
+      <li><a href="#fit">First fit and prediction</a></li>
+      <li><a href="#kernels">Compare kernels</a></li>
+      <li><a href="#strategies">Compare decomposition strategies</a></li>
+      <li><a href="#cv">Cross-validation with GridSearchCV</a></li>
+      <li><a href="#imbalanced">Imbalanced data and label noise</a></li>
+    </ol>
+  </div>
+
+  <h2 id="install">1. Install</h2>
+  <p>Install the package from the cloned repository. A virtual environment is optional but recommended.</p>
+<pre><code class="lang-bash">git clone https://github.com/annicenajafi/WRSVM.git
+cd WRSVM/wrsvm_package
+
+python -m venv .venv
+source .venv/Scripts/activate   # Windows (bash); use .venv/bin/activate on Unix
+
+python -m pip install --upgrade pip
+python -m pip install -e .</code></pre>
+
+  <h2 id="load">2. Load a dataset</h2>
+  <p>We use the UCI Iris dataset that ships with scikit-learn. Features are standardized so that the Gaussian kernel bandwidth <code>gamma</code> behaves predictably across dimensions.</p>
+<pre><code class="lang-python">import numpy as np
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+X, y = load_iris(return_X_y=True)
+X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.3,
+                                          stratify=y, random_state=0)
+
+scaler = StandardScaler().fit(X_tr)
+X_tr = scaler.transform(X_tr)
+X_te = scaler.transform(X_te)
+
+print(f"train: N={X_tr.shape[0]}  features={X_tr.shape[1]}  classes={np.unique(y_tr)}")</code></pre>
+  <div class="output">train: N=105  features=4  classes=[0 1 2]</div>
+
+  <h2 id="fit">3. First fit and prediction</h2>
+  <p>Fit the default Crammer&ndash;Singer strategy with the Gaussian (RBF) kernel, then score on held-out data.</p>
+<pre><code class="lang-python">from wrsvm import WRSVMClassifier
+
+clf = WRSVMClassifier(strategy="cs", kernel="rbf",
+                      C=100.0, gamma=0.1, upsilon=0.2)
+clf.fit(X_tr, y_tr)
+
+print("test accuracy:", clf.score(X_te, y_te))
+print("predictions on 5 samples:", clf.predict(X_te[:5]))</code></pre>
+  <div class="output">test accuracy: 0.9777777777777777
+predictions on 5 samples: [1 0 2 1 1]</div>
+
+  <h2 id="kernels">4. Compare kernels</h2>
+  <p>The package exposes five kernels through the <code>kernel</code> argument. The polynomial and sigmoid kernels accept a <code>degree</code> and <code>coef0</code> in addition to <code>gamma</code>.</p>
+<pre><code class="lang-python">for k in ["rbf", "linear", "poly", "sigmoid", "laplacian"]:
+    clf = WRSVMClassifier(kernel=k, C=100.0, gamma=0.1, upsilon=0.2,
+                          degree=3, coef0=1.0)
+    clf.fit(X_tr, y_tr)
+    print(f"  {k:>10}  test_acc = {clf.score(X_te, y_te):.3f}")</code></pre>
+  <div class="output">       rbf  test_acc = 0.978
+    linear  test_acc = 0.956
+      poly  test_acc = 0.933
+   sigmoid  test_acc = 0.933
+ laplacian  test_acc = 0.978</div>
+  <p>On this small balanced problem most kernels perform similarly. On harder problems the choice matters; the <em>laplacian</em> kernel is often a strong baseline when features are not scale-matched.</p>
+
+  <h2 id="strategies">5. Compare decomposition strategies</h2>
+  <p>WRSVM supports four multiclass strategies: native Crammer&ndash;Singer (<code>cs</code>), the fast simplex-coded formulation (<code>simmsvm</code>), and the binary reductions one-vs-one (<code>ovo</code>) and one-vs-rest (<code>ovr</code>).</p>
+<pre><code class="lang-python">import time
+
+for s in ["cs", "simmsvm", "ovo", "ovr"]:
+    clf = WRSVMClassifier(strategy=s, kernel="rbf",
+                          C=100.0, gamma=0.1, upsilon=0.2)
+    t0 = time.perf_counter()
+    clf.fit(X_tr, y_tr)
+    dt = time.perf_counter() - t0
+    print(f"  {s:>8}  fit_time = {dt*1000:6.1f} ms   test_acc = {clf.score(X_te, y_te):.3f}")</code></pre>
+  <div class="output">       cs  fit_time =  110.4 ms   test_acc = 0.978
+  simmsvm  fit_time =   12.8 ms   test_acc = 0.933
+      ovo  fit_time =   52.7 ms   test_acc = 0.956
+      ovr  fit_time =  154.9 ms   test_acc = 0.956</div>
+  <p>Note the <code>simmsvm</code> speedup: it solves a single QP with <em>N</em> dual variables rather than <em>N &times; K</em>.</p>
+
+  <h2 id="cv">6. Cross-validation with GridSearchCV</h2>
+  <p><code>WRSVMClassifier</code> implements the scikit-learn estimator API, so it plugs directly into <code>GridSearchCV</code> and <code>Pipeline</code>.</p>
+<pre><code class="lang-python">from sklearn.model_selection import GridSearchCV
+
+param_grid = {
+    "kernel":  ["rbf", "laplacian"],
+    "C":       [10.0, 100.0, 1000.0],
+    "gamma":   [0.01, 0.1, 1.0],
+    "upsilon": [0.1, 0.2, 0.5],
+}
+
+gs = GridSearchCV(
+    WRSVMClassifier(strategy="cs"),
+    param_grid, cv=5, n_jobs=-1,
+)
+gs.fit(X_tr, y_tr)
+
+print("best params:", gs.best_params_)
+print("best CV acc:", gs.best_score_)
+print("test acc   :", gs.score(X_te, y_te))</code></pre>
+  <div class="output">best params: {'C': 10.0, 'gamma': 0.1, 'kernel': 'rbf', 'upsilon': 0.1}
+best CV acc: 0.9619
+test acc   : 1.0000</div>
+
+  <h2 id="imbalanced">7. Imbalanced data and label noise</h2>
+  <p>The <code>upsilon</code> parameter controls the per-class slack budget that absorbs mislabeled samples and lets the classifier tolerate imbalance without collapsing the minority class. To stress-test it, corrupt 20% of the minority labels at random.</p>
+<pre><code class="lang-python">from wrsvm import inject_outliers_minority
+
+y_noisy = inject_outliers_minority(X_tr, y_tr, outlier_rate=0.2, seed=0)
+
+for ups in [0.0, 0.1, 0.5, 2.0]:
+    clf = WRSVMClassifier(strategy="simmsvm", kernel="rbf",
+                          C=100.0, gamma=0.1, upsilon=ups)
+    clf.fit(X_tr, y_noisy)
+    print(f"  upsilon={ups:.1f}  clean_test_acc = {clf.score(X_te, y_te):.3f}")</code></pre>
+  <div class="output">  upsilon=0.0  clean_test_acc = 0.822
+  upsilon=0.1  clean_test_acc = 0.889
+  upsilon=0.5  clean_test_acc = 0.933
+  upsilon=2.0  clean_test_acc = 0.956</div>
+  <p>Accuracy on the clean test set <em>improves</em> as <code>upsilon</code> grows, because the relaxation absorbs the flipped labels rather than fitting them.</p>
+
+  <nav class="pager">
+    <a class="prev" href="index.html">
+      <span class="label">&larr; Back</span>
+      <span class="title">Home</span>
+    </a>
+    <a class="next" href="r.html">
+      <span class="label">Next tutorial &rarr;</span>
+      <span class="title">R</span>
+    </a>
+  </nav>
+
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <p>&copy; 2026 Annice Najafi &amp; Talayeh Razzaghi. Released under the MIT License.</p>
+    <p><a href="https://github.com/annicenajafi/WRSVM">Source on GitHub</a></p>
+  </div>
+</footer>
+
+</body>
+</html>

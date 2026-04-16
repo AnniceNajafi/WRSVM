@@ -348,6 +348,195 @@ a:hover {
   color: var(--ink-soft);
 }
 
+/* ---------- Top navigation (book-style) ---------- */
+
+.topnav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(251, 245, 248, 0.92);
+  backdrop-filter: saturate(180%) blur(8px);
+  -webkit-backdrop-filter: saturate(180%) blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+
+.topnav .container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+}
+
+.topnav .brand {
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--ink);
+  text-decoration: none;
+  font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  letter-spacing: 0.02em;
+  border-bottom: none;
+}
+
+.topnav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: 18px;
+}
+
+.topnav a {
+  color: var(--ink-soft);
+  font-size: 0.96rem;
+  font-weight: 500;
+  text-decoration: none;
+  padding: 4px 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.topnav a:hover {
+  color: var(--accent);
+  border-bottom-color: transparent;
+}
+
+.topnav a.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* ---------- Tutorial-page layout ---------- */
+
+.page-header {
+  padding: 60px 0 28px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #ffffff 0%, var(--accent-soft) 100%);
+}
+
+.page-header h1 {
+  font-size: 2.8rem;
+  color: var(--ink);
+  margin: 0 0 10px;
+  font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  letter-spacing: -0.02em;
+}
+
+.page-header .tagline {
+  margin: 0 auto;
+  max-width: 640px;
+  color: var(--ink-soft);
+  font-size: 1.05rem;
+}
+
+.toc {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 22px;
+  margin: 28px 0;
+}
+
+.toc h3 {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-soft);
+}
+
+.toc ol {
+  margin: 0;
+  padding-left: 22px;
+  color: var(--ink);
+}
+
+.toc li {
+  margin: 4px 0;
+}
+
+.toc a {
+  color: var(--ink);
+}
+
+.toc a:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.output {
+  background: #F4E4EE;
+  border-left: 4px solid var(--pink);
+  padding: 12px 16px;
+  margin: 4px 0 18px;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.88rem;
+  white-space: pre-wrap;
+  color: var(--ink);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.output::before {
+  content: "output ";
+  font-family: inherit;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.pager {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 16px;
+  margin: 48px 0 12px;
+  padding-top: 32px;
+  border-top: 1px solid var(--border);
+}
+
+.pager a {
+  flex: 1;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-alt);
+  text-decoration: none;
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  transition: transform 0.1s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pager a:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  box-shadow: 0 4px 14px rgba(74,45,69,0.14);
+}
+
+.pager a.prev {
+  text-align: left;
+}
+
+.pager a.next {
+  text-align: right;
+}
+
+.pager .label {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  margin-bottom: 4px;
+}
+
+.pager .title {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--ink);
+}
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 600px) {
@@ -356,4 +545,7 @@ a:hover {
   .section   { padding: 40px 0; }
   h2         { font-size: 1.5rem; }
   pre        { font-size: 0.82rem; padding: 12px; }
+  .topnav .container { flex-direction: column; gap: 10px; padding: 12px 16px; }
+  .topnav ul { gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .pager { flex-direction: column; }
 }

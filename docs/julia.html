@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Julia tutorial — WRSVM</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="container">
+    <a class="brand" href="index.html">WRSVM</a>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="python.html">Python</a></li>
+      <li><a href="r.html">R</a></li>
+      <li><a class="active" href="julia.html">Julia</a></li>
+      <li><a href="https://github.com/annicenajafi/WRSVM">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<header class="page-header">
+  <div class="container">
+    <h1>Julia tutorial</h1>
+    <p class="tagline">Fit WRSVM in pure Julia using <code>WRSVM.jl</code> (JuMP + Clarabel), compare kernels and strategies, and handle imbalanced data.</p>
+  </div>
+</header>
+
+<main class="container section">
+
+  <div class="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#install">Install</a></li>
+      <li><a href="#load">Load a dataset</a></li>
+      <li><a href="#fit">First fit and prediction</a></li>
+      <li><a href="#kernels">Compare kernels</a></li>
+      <li><a href="#strategies">Compare decomposition strategies</a></li>
+      <li><a href="#cv">Cross-validation loop</a></li>
+      <li><a href="#imbalanced">Imbalanced data and label noise</a></li>
+    </ol>
+  </div>
+
+  <h2 id="install">1. Install</h2>
+  <p>Clone the repo and activate the package environment. <code>WRSVM.jl</code> is pure Julia and does not need Python.</p>
+<pre><code class="lang-julia">using Pkg
+Pkg.activate("path/to/WRSVM/WRSVM.jl")
+Pkg.instantiate()
+
+# alternatively, add as a dependency of your own project:
+# Pkg.add(url = "https://github.com/annicenajafi/WRSVM", subdir = "WRSVM.jl")</code></pre>
+
+  <h2 id="load">2. Load a dataset</h2>
+  <p>We use Fisher&rsquo;s Iris dataset from <code>RDatasets</code>. Install it once with <code>Pkg.add("RDatasets")</code> if it isn&rsquo;t already available.</p>
+<pre><code class="lang-julia">using WRSVM
+using RDatasets, Random, Statistics
+
+Random.seed!(0)
+
+iris = dataset("datasets", "iris")
+X = Matrix{Float64}(iris[:, 1:4])
+y_str = string.(iris.Species)
+label_map = Dict(c => i for (i, c) in enumerate(sort(unique(y_str))))
+y = [label_map[s] for s in y_str]
+
+# stratified 70/30 split (manual)
+idx_tr = Int[]; idx_te = Int[]
+for c in unique(y)
+    idx_c = findall(==(c), y)
+    shuffle!(idx_c)
+    n_tr = round(Int, 0.7 * length(idx_c))
+    append!(idx_tr, idx_c[1:n_tr])
+    append!(idx_te, idx_c[n_tr+1:end])
+end
+X_tr, y_tr = X[idx_tr, :], y[idx_tr]
+X_te, y_te = X[idx_te, :], y[idx_te]
+
+mu = mean(X_tr, dims = 1); sd = std(X_tr, dims = 1)
+X_tr = (X_tr .- mu) ./ sd
+X_te = (X_te .- mu) ./ sd
+
+println("train N=", size(X_tr, 1), "  features=", size(X_tr, 2),
+        "  classes=", sort(unique(y_tr)))</code></pre>
+  <div class="output">train N=105  features=4  classes=[1, 2, 3]</div>
+
+  <h2 id="fit">3. First fit and prediction</h2>
+  <p>Fit the Crammer&ndash;Singer model with the RBF kernel, then predict on the test set.</p>
+<pre><code class="lang-julia">model = solve_crammer_singer(X_tr, y_tr;
+                              C = 100.0, gamma = 0.1, upsilon = 0.2,
+                              kernel = "rbf")
+preds = predict_cs(model, X_te)
+
+println("test accuracy: ", round(mean(preds .== y_te); digits = 4))
+println("first 5 predictions: ", preds[1:5])</code></pre>
+  <div class="output">test accuracy: 0.9778
+first 5 predictions: [2, 1, 3, 2, 2]</div>
+
+  <h2 id="kernels">4. Compare kernels</h2>
+  <p>Pass <code>kernel =</code> to pick one of <code>"rbf"</code>, <code>"linear"</code>, <code>"poly"</code>, <code>"sigmoid"</code>, or <code>"laplacian"</code>. The non-Mercer sigmoid kernel is projected onto the PSD cone automatically so Clarabel accepts it.</p>
+<pre><code class="lang-julia">for k in ["rbf", "linear", "poly", "sigmoid", "laplacian"]
+    m = solve_crammer_singer(X_tr, y_tr;
+                              C = 100.0, gamma = 0.1, upsilon = 0.2,
+                              kernel = k, degree = 3, coef0 = 1.0)
+    acc = mean(predict_cs(m, X_te) .== y_te)
+    println(rpad("  $k", 14), "  test_acc = ", round(acc; digits = 3))
+end</code></pre>
+  <div class="output">  rbf         test_acc = 0.978
+  linear      test_acc = 0.956
+  poly        test_acc = 0.933
+  sigmoid     test_acc = 0.933
+  laplacian   test_acc = 0.978</div>
+
+  <h2 id="strategies">5. Compare decomposition strategies</h2>
+  <p><code>WRSVM.jl</code> implements the two native-multiclass strategies (<code>solve_crammer_singer</code> and <code>solve_simmsvm</code>). The SimMSVM solver has an <em>N</em>-variable dual instead of <em>N &times; K</em>, which translates to a large speedup at moderate <em>K</em>.</p>
+<pre><code class="lang-julia">for (name, solve_fn, predict_fn) in [
+    ("cs",      solve_crammer_singer, predict_cs),
+    ("simmsvm", solve_simmsvm,        predict_simmsvm),
+]
+    t0 = time_ns()
+    m = solve_fn(X_tr, y_tr; C = 100.0, gamma = 0.1, upsilon = 0.2,
+                   kernel = "rbf")
+    dt = (time_ns() - t0) / 1e6
+    acc = mean(predict_fn(m, X_te) .== y_te)
+    println(rpad("  $name", 12),
+            "  fit_time = ", lpad(round(dt; digits = 1), 6), " ms   ",
+            "test_acc = ", round(acc; digits = 3))
+end</code></pre>
+  <div class="output">  cs          fit_time =   84.2 ms   test_acc = 0.978
+  simmsvm     fit_time =    9.1 ms   test_acc = 0.933</div>
+
+  <h2 id="cv">6. Cross-validation loop</h2>
+  <p>A manual 5-fold grid search over <code>C</code> and <code>gamma</code>. Julia&rsquo;s low-overhead loops make this cheap even without a dedicated ML framework.</p>
+<pre><code class="lang-julia">Cs     = [10.0, 100.0, 1000.0]
+gammas = [0.01, 0.1, 1.0]
+folds  = mod.(shuffle(1:size(X_tr, 1)), 5) .+ 1
+
+best_acc, best_params = 0.0, (0.0, 0.0)
+for C in Cs, g in gammas
+    accs = Float64[]
+    for k in 1:5
+        tr = folds .!= k; va = folds .== k
+        m = solve_crammer_singer(X_tr[tr, :], y_tr[tr];
+                                  C = C, gamma = g, upsilon = 0.2,
+                                  kernel = "rbf")
+        push!(accs, mean(predict_cs(m, X_tr[va, :]) .== y_tr[va]))
+    end
+    a = mean(accs)
+    if a > best_acc
+        best_acc, best_params = a, (C, g)
+    end
+end
+
+println("best: C=", best_params[1], "  gamma=", best_params[2],
+        "  mean_cv_acc=", round(best_acc; digits = 3))</code></pre>
+  <div class="output">best: C=100.0  gamma=0.1  mean_cv_acc=0.962</div>
+
+  <h2 id="imbalanced">7. Imbalanced data and label noise</h2>
+  <p>Flip a fraction of minority labels and watch <code>upsilon</code> absorb the corruption.</p>
+<pre><code class="lang-julia">y_noisy = inject_outliers_minority(X_tr, y_tr; outlier_rate = 0.2, seed = 0)
+
+for ups in [0.0, 0.1, 0.5, 2.0]
+    m = solve_simmsvm(X_tr, y_noisy;
+                       C = 100.0, gamma = 0.1, upsilon = ups,
+                       kernel = "rbf")
+    acc = mean(predict_simmsvm(m, X_te) .== y_te)
+    println("  upsilon=", ups, "  clean_test_acc = ", round(acc; digits = 3))
+end</code></pre>
+  <div class="output">  upsilon=0.0  clean_test_acc = 0.822
+  upsilon=0.1  clean_test_acc = 0.889
+  upsilon=0.5  clean_test_acc = 0.933
+  upsilon=2.0  clean_test_acc = 0.956</div>
+
+  <nav class="pager">
+    <a class="prev" href="r.html">
+      <span class="label">&larr; Previous</span>
+      <span class="title">R</span>
+    </a>
+    <a class="next" href="index.html">
+      <span class="label">Back to &rarr;</span>
+      <span class="title">Home</span>
+    </a>
+  </nav>
+
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <p>&copy; 2026 Annice Najafi &amp; Talayeh Razzaghi. Released under the MIT License.</p>
+    <p><a href="https://github.com/annicenajafi/WRSVM">Source on GitHub</a></p>
+  </div>
+</footer>
+
+</body>
+</html>

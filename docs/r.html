@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>R tutorial — WRSVM</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="container">
+    <a class="brand" href="index.html">WRSVM</a>
+    <ul>
+      <li><a href="index.html">Home</a></li>
+      <li><a href="python.html">Python</a></li>
+      <li><a class="active" href="r.html">R</a></li>
+      <li><a href="julia.html">Julia</a></li>
+      <li><a href="https://github.com/annicenajafi/WRSVM">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<header class="page-header">
+  <div class="container">
+    <h1>R tutorial</h1>
+    <p class="tagline">Fit WRSVM from R using the <code>WRSVMr</code> reticulate wrapper, compare kernels and strategies, and handle imbalanced data.</p>
+  </div>
+</header>
+
+<main class="container section">
+
+  <div class="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#install">Install</a></li>
+      <li><a href="#load">Load a dataset</a></li>
+      <li><a href="#fit">First fit and prediction</a></li>
+      <li><a href="#kernels">Compare kernels</a></li>
+      <li><a href="#strategies">Compare decomposition strategies</a></li>
+      <li><a href="#cv">Cross-validation loop</a></li>
+      <li><a href="#imbalanced">Imbalanced data and label noise</a></li>
+    </ol>
+  </div>
+
+  <h2 id="install">1. Install</h2>
+  <p><code>WRSVMr</code> is a thin <code>reticulate</code> wrapper around the Python <code>wrsvm</code> package. You need a working Python interpreter with <code>wrsvm</code> installed; then install the R side.</p>
+<pre><code class="lang-r"># 1) Python backend (one-time)
+install.packages("reticulate")
+reticulate::install_python(version = "3.11.9")
+reticulate::py_install("wrsvm", pip = TRUE)
+
+# 2) R wrapper
+install.packages("remotes")
+remotes::install_github("annicenajafi/WRSVM", subdir = "WRSVMr")
+
+# Or point reticulate at an existing Python interpreter
+# (recommended on Windows to avoid the pyenv-win / WindowsApps stub):
+Sys.setenv(RETICULATE_PYTHON = "C:/path/to/python.exe")
+library(WRSVMr)</code></pre>
+
+  <h2 id="load">2. Load a dataset</h2>
+  <p>The Iris dataset ships with base R. Scale features and split into train and test.</p>
+<pre><code class="lang-r">library(WRSVMr)
+set.seed(0)
+
+data(iris)
+X <- as.matrix(iris[, 1:4])
+y <- as.integer(iris$Species)
+
+train_idx <- sample(seq_len(nrow(X)), size = round(0.7 * nrow(X)))
+X_tr <- X[train_idx, ];  y_tr <- y[train_idx]
+X_te <- X[-train_idx, ]; y_te <- y[-train_idx]
+
+mu <- colMeans(X_tr); sd <- apply(X_tr, 2, sd)
+X_tr <- sweep(sweep(X_tr, 2, mu), 2, sd, "/")
+X_te <- sweep(sweep(X_te, 2, mu), 2, sd, "/")
+
+cat(sprintf("train N=%d  features=%d  classes=%s\n",
+            nrow(X_tr), ncol(X_tr), paste(sort(unique(y_tr)), collapse = ",")))</code></pre>
+  <div class="output">train N=105  features=4  classes=1,2,3</div>
+
+  <h2 id="fit">3. First fit and prediction</h2>
+  <p>Fit the default Crammer&ndash;Singer strategy with the RBF kernel, then score on held-out data.</p>
+<pre><code class="lang-r">fit <- wrsvm_fit(X_tr, y_tr,
+                 strategy = "cs", kernel = "rbf",
+                 C = 100, gamma = 0.1, upsilon = 0.2)
+
+preds <- wrsvm_predict(fit, X_te)
+cat(sprintf("test accuracy: %.4f\n", mean(preds == y_te)))
+cat("first 5 predictions:", head(preds, 5), "\n")</code></pre>
+  <div class="output">test accuracy: 0.9778
+first 5 predictions: 2 1 3 2 2</div>
+
+  <h2 id="kernels">4. Compare kernels</h2>
+  <p>Pass the <code>kernel</code> argument to pick one of the five supported kernels. Polynomial and sigmoid use <code>degree</code> and <code>coef0</code> in addition to <code>gamma</code>.</p>
+<pre><code class="lang-r">for (k in c("rbf", "linear", "poly", "sigmoid", "laplacian")) {
+  fit <- wrsvm_fit(X_tr, y_tr, kernel = k,
+                   C = 100, gamma = 0.1, upsilon = 0.2,
+                   degree = 3L, coef0 = 1.0)
+  acc <- mean(wrsvm_predict(fit, X_te) == y_te)
+  cat(sprintf("  %-10s  test_acc = %.3f\n", k, acc))
+}</code></pre>
+  <div class="output">  rbf         test_acc = 0.978
+  linear      test_acc = 0.956
+  poly        test_acc = 0.933
+  sigmoid     test_acc = 0.933
+  laplacian   test_acc = 0.978</div>
+
+  <h2 id="strategies">5. Compare decomposition strategies</h2>
+  <p>Pass <code>strategy</code> to pick cs, simmsvm, ovo, or ovr. <code>simmsvm</code> is the fastest because it solves a single QP in <em>N</em> dual variables instead of <em>N &times; K</em>.</p>
+<pre><code class="lang-r">for (s in c("cs", "simmsvm", "ovo", "ovr")) {
+  t0 <- Sys.time()
+  fit <- wrsvm_fit(X_tr, y_tr, strategy = s,
+                   C = 100, gamma = 0.1, upsilon = 0.2)
+  dt <- as.numeric(Sys.time() - t0, units = "secs") * 1000
+  acc <- mean(wrsvm_predict(fit, X_te) == y_te)
+  cat(sprintf("  %-8s  fit_time = %6.1f ms   test_acc = %.3f\n", s, dt, acc))
+}</code></pre>
+  <div class="output">  cs        fit_time =  115.8 ms   test_acc = 0.978
+  simmsvm   fit_time =   14.1 ms   test_acc = 0.933
+  ovo       fit_time =   56.4 ms   test_acc = 0.956
+  ovr       fit_time =  158.3 ms   test_acc = 0.956</div>
+
+  <h2 id="cv">6. Cross-validation loop</h2>
+  <p>A minimal 5-fold manual grid search over <code>C</code> and <code>gamma</code>. Swap in the <code>caret</code> package if you need full model-selection machinery.</p>
+<pre><code class="lang-r">grid <- expand.grid(C = c(10, 100, 1000),
+                    gamma = c(0.01, 0.1, 1.0))
+folds <- sample(rep(1:5, length.out = nrow(X_tr)))
+
+scores <- numeric(nrow(grid))
+for (g in seq_len(nrow(grid))) {
+  acc_folds <- sapply(1:5, function(k) {
+    tr <- folds != k; va <- folds == k
+    fit <- wrsvm_fit(X_tr[tr, ], y_tr[tr],
+                     C = grid$C[g], gamma = grid$gamma[g], upsilon = 0.2)
+    mean(wrsvm_predict(fit, X_tr[va, ]) == y_tr[va])
+  })
+  scores[g] <- mean(acc_folds)
+}
+
+best <- which.max(scores)
+cat(sprintf("best: C=%g gamma=%g  mean_cv_acc=%.3f\n",
+            grid$C[best], grid$gamma[best], scores[best]))</code></pre>
+  <div class="output">best: C=100 gamma=0.1  mean_cv_acc=0.962</div>
+
+  <h2 id="imbalanced">7. Imbalanced data and label noise</h2>
+  <p>Use <code>inject_outliers_minority()</code> to flip a fraction of minority-class labels and see how <code>upsilon</code> protects accuracy against label corruption.</p>
+<pre><code class="lang-r">y_noisy <- inject_outliers_minority(X_tr, y_tr,
+                                     outlier_rate = 0.2, seed = 0L)
+
+for (ups in c(0.0, 0.1, 0.5, 2.0)) {
+  fit <- wrsvm_fit(X_tr, y_noisy, strategy = "simmsvm",
+                   C = 100, gamma = 0.1, upsilon = ups)
+  acc <- mean(wrsvm_predict(fit, X_te) == y_te)
+  cat(sprintf("  upsilon=%.1f  clean_test_acc = %.3f\n", ups, acc))
+}</code></pre>
+  <div class="output">  upsilon=0.0  clean_test_acc = 0.822
+  upsilon=0.1  clean_test_acc = 0.889
+  upsilon=0.5  clean_test_acc = 0.933
+  upsilon=2.0  clean_test_acc = 0.956</div>
+
+  <nav class="pager">
+    <a class="prev" href="python.html">
+      <span class="label">&larr; Previous</span>
+      <span class="title">Python</span>
+    </a>
+    <a class="next" href="julia.html">
+      <span class="label">Next tutorial &rarr;</span>
+      <span class="title">Julia</span>
+    </a>
+  </nav>
+
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <p>&copy; 2026 Annice Najafi &amp; Talayeh Razzaghi. Released under the MIT License.</p>
+    <p><a href="https://github.com/annicenajafi/WRSVM">Source on GitHub</a></p>
+  </div>
+</footer>
+
+</body>
+</html>
