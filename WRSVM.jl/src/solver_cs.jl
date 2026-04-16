@@ -15,6 +15,9 @@ struct WRSVMModel
     gamma::Float64
     C::Float64
     upsilon::Float64
+    kernel::String
+    degree::Int
+    coef0::Float64
 end
 
 """
@@ -24,7 +27,10 @@ Solve the Crammer-Singer WRSVM dual QP using Clarabel.
 """
 function solve_crammer_singer(X::AbstractMatrix, y::AbstractVector;
                                C::Real, gamma::Real,
-                               upsilon::Real = 0.3)
+                               upsilon::Real = 0.3,
+                               kernel::AbstractString = "rbf",
+                               degree::Integer = 3,
+                               coef0::Real = 0.0)
     Xf = Matrix{Float64}(X)
     classes = sort(unique(y))
     K_cls = length(classes)
@@ -35,7 +41,13 @@ function solve_crammer_singer(X::AbstractMatrix, y::AbstractVector;
         n_c[k] += 1.0
     end
 
-    K_mat = rbf_kernel(Xf, Xf; gamma = gamma) + I(N) * 1e-6
+    K_mat = compute_kernel(Xf, Xf; kernel = kernel, gamma = gamma,
+                           degree = degree, coef0 = coef0)
+    if kernel == "sigmoid"
+        # Sigmoid kernel is not Mercer; project onto PSD cone.
+        K_mat = _psd_project(Symmetric(0.5 .* (K_mat .+ K_mat')))
+    end
+    K_mat = K_mat + I(N) * 1e-6
     pos_mask = zeros(Float64, N, K_cls)
     for i in 1:N
         pos_mask[i, y_idx[i]] = 1.0
@@ -93,7 +105,8 @@ function solve_crammer_singer(X::AbstractMatrix, y::AbstractVector;
 
     return WRSVMModel(alpha_mat, theta, Vector{Float64}(beta_vals), b,
                       Xf, classes, K_cls, n_c, Float64(gamma),
-                      Float64(C), Float64(upsilon))
+                      Float64(C), Float64(upsilon),
+                      String(kernel), Int(degree), Float64(coef0))
 end
 
 function _build_hessian_cs(K_mat, pos_mask, w_diag)
@@ -192,7 +205,9 @@ Predict class labels from a Crammer-Singer `WRSVMModel`.
 """
 function predict_cs(model::WRSVMModel, X_new::AbstractMatrix)
     Xn = Matrix{Float64}(X_new)
-    K_new = rbf_kernel(Xn, model.X_train; gamma = model.gamma)
+    K_new = compute_kernel(Xn, model.X_train;
+                           kernel = model.kernel, gamma = model.gamma,
+                           degree = model.degree, coef0 = model.coef0)
     scores = K_new * model.theta .+ model.b'
     scores[isnan.(scores) .| isinf.(scores)] .= 0.0
     pred_idx = [argmax(scores[i, :]) for i in 1:size(Xn, 1)]

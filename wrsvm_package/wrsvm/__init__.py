@@ -6,7 +6,14 @@ through a single scikit-learn compatible classifier.
 
 from wrsvm.classifier import WRSVMClassifier
 from wrsvm.decomposition import OVOClassifier, OVRClassifier
-from wrsvm.kernels import rbf_kernel
+from wrsvm.kernels import (
+    compute_kernel,
+    laplacian_kernel,
+    linear_kernel,
+    poly_kernel,
+    rbf_kernel,
+    sigmoid_kernel,
+)
 from wrsvm.noise import inject_outliers_majority, inject_outliers_minority
 from wrsvm.simmsvm import predict_simmsvm, solve_simmsvm
 from wrsvm.solver import predict, solve_crammer_singer
@@ -16,7 +23,12 @@ __all__ = [
     "WRSVMClassifier",
     "OVOClassifier",
     "OVRClassifier",
+    "compute_kernel",
     "rbf_kernel",
+    "linear_kernel",
+    "poly_kernel",
+    "sigmoid_kernel",
+    "laplacian_kernel",
     "solve_crammer_singer",
     "solve_simmsvm",
     "predict",

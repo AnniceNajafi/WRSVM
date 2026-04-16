@@ -18,10 +18,14 @@ class OVOClassifier:
 
     def __init__(self, C: float = 100.0, gamma: float = 0.1,
                  upsilon: float = 0.2,
+                 kernel: str = "rbf", degree: int = 3, coef0: float = 0.0,
                  solver: str = "CLARABEL", kernel_backend: str = "numpy"):
         self.C = C
         self.gamma = gamma
         self.upsilon = upsilon
+        self.kernel = kernel
+        self.degree = degree
+        self.coef0 = coef0
         self.solver = solver
         self.kernel_backend = kernel_backend
 
@@ -41,6 +45,7 @@ class OVOClassifier:
             res = solve_crammer_singer(
                 X_pair, y_pair, C=self.C, gamma=self.gamma,
                 upsilon=self.upsilon,
+                kernel=self.kernel, degree=self.degree, coef0=self.coef0,
                 solver=self.solver, kernel_backend=self.kernel_backend,
             )
             self.pair_models_[(ci, cj)] = res
@@ -62,10 +67,14 @@ class OVRClassifier:
 
     def __init__(self, C: float = 100.0, gamma: float = 0.1,
                  upsilon: float = 0.2,
+                 kernel: str = "rbf", degree: int = 3, coef0: float = 0.0,
                  solver: str = "CLARABEL", kernel_backend: str = "numpy"):
         self.C = C
         self.gamma = gamma
         self.upsilon = upsilon
+        self.kernel = kernel
+        self.degree = degree
+        self.coef0 = coef0
         self.solver = solver
         self.kernel_backend = kernel_backend
 
@@ -82,15 +91,18 @@ class OVRClassifier:
             res = solve_crammer_singer(
                 X, y_bin, C=self.C, gamma=self.gamma,
                 upsilon=self.upsilon,
+                kernel=self.kernel, degree=self.degree, coef0=self.coef0,
                 solver=self.solver, kernel_backend=self.kernel_backend,
             )
             self.rest_models_.append(res)
         return self
 
     def _binary_score(self, model: SolverResult, X: np.ndarray) -> np.ndarray:
-        from wrsvm.kernels import rbf_kernel
-        K_new = rbf_kernel(X, model.X_train, gamma=self.gamma,
-                            backend=self.kernel_backend)
+        from wrsvm.kernels import compute_kernel
+        K_new = compute_kernel(X, model.X_train,
+                                kernel=self.kernel, gamma=self.gamma,
+                                degree=self.degree, coef0=self.coef0,
+                                backend=self.kernel_backend)
         scores = K_new @ model.theta + model.b.reshape(1, -1)
         pos_col = int(np.where(model.classes == 1)[0][0])
         neg_col = int(np.where(model.classes == -1)[0][0])

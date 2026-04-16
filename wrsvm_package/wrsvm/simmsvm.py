@@ -17,7 +17,7 @@ from dataclasses import dataclass
 import cvxpy as cp
 import numpy as np
 
-from wrsvm.kernels import rbf_kernel
+from wrsvm.kernels import compute_kernel
 from wrsvm.solver import _solve_with_fallback
 
 
@@ -34,10 +34,14 @@ class SimMSVMResult:
     gamma: float
     C: float
     upsilon: float
+    kernel: str = "rbf"
+    degree: int = 3
+    coef0: float = 0.0
 
 
 def solve_simmsvm(X: np.ndarray, y: np.ndarray, C: float, gamma: float,
                   upsilon: float = 0.3,
+                  kernel: str = "rbf", degree: int = 3, coef0: float = 0.0,
                   solver: str = "CLARABEL",
                   kernel_backend: str = "numpy") -> SimMSVMResult:
     """Solve the SimMSVM (simultaneous multiclass) WRSVM dual QP.
@@ -51,7 +55,9 @@ def solve_simmsvm(X: np.ndarray, y: np.ndarray, C: float, gamma: float,
     y_idx = np.searchsorted(classes, y)
     n_c = np.bincount(y_idx, minlength=K_cls).astype(np.float64)
 
-    K_mat = rbf_kernel(X, X, gamma=gamma, backend=kernel_backend)
+    K_mat = compute_kernel(X, X, kernel=kernel, gamma=gamma,
+                            degree=degree, coef0=coef0,
+                            backend=kernel_backend)
 
     same_class = y_idx[:, None] == y_idx[None, :]
     coef_same = K_cls / (K_cls - 1)
@@ -94,6 +100,7 @@ def solve_simmsvm(X: np.ndarray, y: np.ndarray, C: float, gamma: float,
         alpha=alpha_vals, theta=theta, beta=beta_vals, b=b,
         X_train=X, classes=classes, K_cls=K_cls, n_c=n_c,
         gamma=gamma, C=C, upsilon=upsilon,
+        kernel=kernel, degree=degree, coef0=coef0,
     )
 
 
@@ -141,8 +148,10 @@ def _recover_biases_simmsvm(alpha: np.ndarray, y_idx: np.ndarray,
 def predict_simmsvm(result: SimMSVMResult, X_new: np.ndarray,
                     kernel_backend: str = "numpy") -> np.ndarray:
     X_new = np.asarray(X_new, dtype=np.float64)
-    K_new = rbf_kernel(X_new, result.X_train, gamma=result.gamma,
-                       backend=kernel_backend)
+    K_new = compute_kernel(X_new, result.X_train,
+                            kernel=result.kernel, gamma=result.gamma,
+                            degree=result.degree, coef0=result.coef0,
+                            backend=kernel_backend)
     scores = K_new @ result.theta + result.b.reshape(1, -1)
     scores = np.nan_to_num(scores, nan=0.0, posinf=0.0, neginf=0.0)
     return result.classes[scores.argmax(axis=1)]

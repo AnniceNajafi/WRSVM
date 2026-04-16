@@ -30,7 +30,14 @@ class WRSVMClassifier(BaseEstimator, ClassifierMixin):
     ----------
     strategy : {"cs", "simmsvm", "ovo", "ovr"}, default "cs"
     C : float, default 100.0
+    kernel : {"rbf", "linear", "poly", "sigmoid", "laplacian"}, default "rbf"
     gamma : float, default 0.1
+        Bandwidth for rbf / laplacian / sigmoid; feature scale for poly.
+        Ignored by the linear kernel.
+    degree : int, default 3
+        Polynomial degree. Only used when ``kernel="poly"``.
+    coef0 : float, default 0.0
+        Independent term for ``kernel in {"poly", "sigmoid"}``.
     upsilon : float, default 0.2
     solver : str, default "CLARABEL"
         One of ``"CLARABEL"``, ``"SCS"``, ``"SCS_GPU"``, ``"GUROBI"``, or any
@@ -40,11 +47,15 @@ class WRSVMClassifier(BaseEstimator, ClassifierMixin):
 
     def __init__(self, strategy: str = "cs",
                  C: float = 100.0, gamma: float = 0.1, upsilon: float = 0.2,
+                 kernel: str = "rbf", degree: int = 3, coef0: float = 0.0,
                  solver: str = "CLARABEL", kernel_backend: str = "numpy"):
         self.strategy = strategy
         self.C = C
         self.gamma = gamma
         self.upsilon = upsilon
+        self.kernel = kernel
+        self.degree = degree
+        self.coef0 = coef0
         self.solver = solver
         self.kernel_backend = kernel_backend
 
@@ -57,6 +68,7 @@ class WRSVMClassifier(BaseEstimator, ClassifierMixin):
             raise ValueError("At least two classes are required.")
 
         kw = dict(C=self.C, gamma=self.gamma, upsilon=self.upsilon,
+                  kernel=self.kernel, degree=self.degree, coef0=self.coef0,
                   solver=self.solver, kernel_backend=self.kernel_backend)
 
         if self.strategy == "cs":
@@ -94,8 +106,10 @@ class WRSVMClassifier(BaseEstimator, ClassifierMixin):
                 f"decision_function is not implemented for strategy={self.strategy!r}; "
                 "use predict()."
             )
-        from wrsvm.kernels import rbf_kernel
+        from wrsvm.kernels import compute_kernel
         X = np.asarray(X, dtype=np.float64)
-        K_new = rbf_kernel(X, self.result_.X_train, gamma=self.gamma,
-                            backend=self.kernel_backend)
+        K_new = compute_kernel(X, self.result_.X_train,
+                                kernel=self.kernel, gamma=self.gamma,
+                                degree=self.degree, coef0=self.coef0,
+                                backend=self.kernel_backend)
         return K_new @ self.result_.theta + self.result_.b.reshape(1, -1)

@@ -5,7 +5,9 @@ Solve the SimMSVM WRSVM dual QP (one dual per sample, specially-constructed
 Gram matrix).
 """
 function solve_simmsvm(X::AbstractMatrix, y::AbstractVector;
-                        C::Real, gamma::Real, upsilon::Real = 0.3)
+                        C::Real, gamma::Real, upsilon::Real = 0.3,
+                        kernel::AbstractString = "rbf",
+                        degree::Integer = 3, coef0::Real = 0.0)
     Xf = Matrix{Float64}(X)
     classes = sort(unique(y))
     K_cls = length(classes)
@@ -16,7 +18,11 @@ function solve_simmsvm(X::AbstractMatrix, y::AbstractVector;
         n_c[k] += 1.0
     end
 
-    K_mat = rbf_kernel(Xf, Xf; gamma = gamma)
+    K_mat = compute_kernel(Xf, Xf; kernel = kernel, gamma = gamma,
+                           degree = degree, coef0 = coef0)
+    if kernel == "sigmoid"
+        K_mat = _psd_project(Symmetric(0.5 .* (K_mat .+ K_mat')))
+    end
     same_class = [y_idx[i] == y_idx[j] for i in 1:N, j in 1:N]
     coef_same = K_cls / (K_cls - 1)
     coef_diff = -K_cls / (K_cls - 1)^2
@@ -67,7 +73,8 @@ function solve_simmsvm(X::AbstractMatrix, y::AbstractVector;
 
     return WRSVMModel(reshape(alpha_vals, N, 1), theta, beta_vals, b,
                       Xf, classes, K_cls, n_c, Float64(gamma),
-                      Float64(C), Float64(upsilon))
+                      Float64(C), Float64(upsilon),
+                      String(kernel), Int(degree), Float64(coef0))
 end
 
 function _recover_biases_simmsvm(alpha, y_idx, K_mat, theta, n_c, C, beta, K_cls)
@@ -112,7 +119,9 @@ end
 """
 function predict_simmsvm(model::WRSVMModel, X_new::AbstractMatrix)
     Xn = Matrix{Float64}(X_new)
-    K_new = rbf_kernel(Xn, model.X_train; gamma = model.gamma)
+    K_new = compute_kernel(Xn, model.X_train;
+                           kernel = model.kernel, gamma = model.gamma,
+                           degree = model.degree, coef0 = model.coef0)
     scores = K_new * model.theta .+ model.b'
     scores[isnan.(scores) .| isinf.(scores)] .= 0.0
     pred_idx = [argmax(scores[i, :]) for i in 1:size(Xn, 1)]

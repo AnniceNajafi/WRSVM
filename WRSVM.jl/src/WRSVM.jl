@@ -6,7 +6,9 @@ using Statistics
 using JuMP
 import Clarabel
 
-export rbf_kernel,
+export compute_kernel,
+       rbf_kernel, linear_kernel, poly_kernel,
+       sigmoid_kernel, laplacian_kernel,
        solve_crammer_singer, predict_cs,
        solve_simmsvm, predict_simmsvm,
        inject_outliers_majority, inject_outliers_minority,
