@@ -39,4 +39,4 @@ Full documentation is hosted at <https://annicenajafi.github.io/WRSVM/>.
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+MIT [`LICENSE`](LICENSE). This is an open-source software. Please feel free to fork the repository and make any changes you would like to the packages. 
