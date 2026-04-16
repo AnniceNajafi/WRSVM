@@ -1,17 +1,20 @@
 /* WRSVM landing page */
 
 :root {
-  --bg: #fafaf7;
-  --bg-alt: #ffffff;
-  --ink: #1a1a1a;
-  --ink-soft: #555;
-  --accent: #2b4c7e;
-  --accent-soft: #e8eef7;
-  --border: #e5e5e0;
-  --code-bg: #f4f3ef;
-  --code-ink: #2a2a2a;
-  --shadow: 0 1px 3px rgba(0,0,0,0.05);
-  --radius: 8px;
+  /* Figure palette: NAVY / BLUE / PINK / CREAM / PLUM / BLUSH */
+  --bg:          #FBF5F8;  /* warm blush-cream page background */
+  --bg-alt:      #FFFFFF;  /* cards */
+  --ink:         #213C51;  /* NAVY — primary text and headings */
+  --ink-soft:    #8B5A7D;  /* PLUM — muted text */
+  --accent:      #4A2D45;  /* EGGPLANT — primary actions, links */
+  --accent-deep: #2A1A28;  /* deeper eggplant — accent hover */
+  --accent-soft: #F7DBF0;  /* BLUSH — hero gradient, table head */
+  --pink:        #DDAED3;  /* PINK — secondary accent */
+  --border:      #E9D5E1;  /* soft pink-grey */
+  --code-bg:     #EEEEEE;  /* CREAM */
+  --code-ink:    #213C51;  /* NAVY */
+  --shadow:      0 1px 3px rgba(33,60,81,0.06);
+  --radius:      8px;
 }
 
 * { box-sizing: border-box; }
@@ -82,9 +85,9 @@ html, body {
 }
 
 .btn.primary:hover {
-  background: #1f3a64;
+  background: var(--accent-deep);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(43,76,126,0.25);
+  box-shadow: 0 4px 12px rgba(74,45,69,0.28);
 }
 
 .btn.ghost {
@@ -134,7 +137,7 @@ h3 {
   font-size: 1.2rem;
   font-weight: 600;
   margin: 0 0 12px;
-  color: var(--accent);
+  color: var(--ink-soft);
 }
 
 h4 {
@@ -189,7 +192,7 @@ p {
 .dl-card:hover {
   transform: translateY(-2px);
   border-color: var(--accent);
-  box-shadow: 0 4px 14px rgba(43,76,126,0.12);
+  box-shadow: 0 4px 14px rgba(139,90,125,0.15);
 }
 
 .dl-card h3 { margin: 0 0 6px; }
