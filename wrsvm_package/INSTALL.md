@@ -28,7 +28,8 @@ python -m pip --version
 ### 2a. From a local clone (current state of the repo)
 
 ```bash
-cd C:/Users/annic/Documents/WRSVM/wrsvm_package
+git clone https://github.com/annicenajafi/WRSVM.git
+cd WRSVM/wrsvm_package
 python -m pip install -e .
 ```
 
@@ -128,7 +129,7 @@ clf = WRSVMClassifier(C=100, gamma=0.1, solver="GUROBI")
 
 ```bash
 python -c "import wrsvm; print(wrsvm.__version__)"
-# 0.2.0
+# 0.1.0
 ```
 
 Run the bundled smoke test:

@@ -51,7 +51,7 @@ Stdlib packages (`LinearAlgebra`, etc.) ship with Julia and need no install.
 
 ```julia
 using Pkg
-Pkg.develop(path = "C:/Users/annic/Documents/WRSVM/WRSVM.jl")
+Pkg.develop(path = "path/to/WRSVM/WRSVM.jl")
 Pkg.instantiate()
 ```
 
@@ -61,7 +61,7 @@ Pkg.instantiate()
 
 ```julia
 using Pkg
-Pkg.activate("C:/Users/annic/Documents/WRSVM/WRSVM.jl")
+Pkg.activate("path/to/WRSVM/WRSVM.jl")
 Pkg.instantiate()           # resolve from Manifest.toml (reproducible)
 ```
 
@@ -72,9 +72,9 @@ This is the most reproducible — it pins exactly the versions in `Manifest.toml
 ```julia
 using Pkg
 Pkg.activate(".")           # your project
-Pkg.add(url = "https://github.com/annicenajafi/WRSVM.jl")   # when published
+Pkg.add(url = "https://github.com/annicenajafi/WRSVM", subdir = "WRSVM.jl")   # when published
 # or, locally:
-Pkg.add(path = "C:/Users/annic/Documents/WRSVM/WRSVM.jl")
+Pkg.add(path = "path/to/WRSVM/WRSVM.jl")
 ```
 
 ---
@@ -99,14 +99,14 @@ Run the test suite:
 
 ```julia
 using Pkg
-Pkg.activate("C:/Users/annic/Documents/WRSVM/WRSVM.jl")
+Pkg.activate("path/to/WRSVM/WRSVM.jl")
 Pkg.test()
 ```
 
 Or from the shell:
 
 ```bash
-cd C:/Users/annic/Documents/WRSVM/WRSVM.jl
+cd path/to/WRSVM/WRSVM.jl
 julia --project=. -e "using Pkg; Pkg.test()"
 ```
 

@@ -55,7 +55,8 @@ Then point reticulate at that interpreter (see Step C).
 **A3. Install from the local clone (current state of this repo)**
 
 ```bash
-cd C:/Users/annic/Documents/WRSVM/wrsvm_package
+git clone https://github.com/annicenajafi/WRSVM.git
+cd WRSVM/wrsvm_package
 python -m pip install -e .
 ```
 
@@ -64,15 +65,15 @@ python -m pip install -e .
 From a local clone:
 
 ```r
-# from R
+# from R, with the repo cloned locally
 install.packages("remotes")
-remotes::install_local("C:/Users/annic/Documents/WRSVM/WRSVMr")
+remotes::install_local("path/to/WRSVM/WRSVMr")
 ```
 
 Or, if you already cloned and are working inside it:
 
 ```r
-setwd("C:/Users/annic/Documents/WRSVM/WRSVMr")
+setwd("path/to/WRSVM/WRSVMr")
 devtools::install()        # requires `devtools`
 ```
 
@@ -81,11 +82,13 @@ devtools::install()        # requires `devtools`
 `reticulate` has a discovery order that often picks the wrong interpreter on Windows. Force it explicitly:
 
 ```r
-# in ~/.Renviron (persistent across sessions):
-RETICULATE_PYTHON=C:/Users/annic/AppData/Local/Programs/Python/Python311/python.exe
+# in ~/.Renviron (persistent across sessions). Examples:
+#   Windows: RETICULATE_PYTHON=C:/Users/<user>/AppData/Local/Programs/Python/Python311/python.exe
+#   macOS:   RETICULATE_PYTHON=/usr/local/bin/python3
+#   Linux:   RETICULATE_PYTHON=/usr/bin/python3
 
-# or inside an R session, BEFORE library(WRSVMr):
-Sys.setenv(RETICULATE_PYTHON = "C:/path/to/python.exe")
+# Or inside an R session, BEFORE library(WRSVMr):
+Sys.setenv(RETICULATE_PYTHON = "/path/to/python")
 library(WRSVMr)
 ```
 
@@ -116,7 +119,7 @@ mean(wrsvm_predict(fit, X) == y)      # expect ~0.97+
 Run the bundled tests:
 
 ```r
-setwd("C:/Users/annic/Documents/WRSVM/WRSVMr")
+setwd("path/to/WRSVM/WRSVMr")
 testthat::test_local()
 ```
 
